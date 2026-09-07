@@ -1,0 +1,138 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: #0f172a;
+    --color-surface: #1e293b;
+    --color-border: #334155;
+    --color-text: #f1f5f9;
+    --color-muted: #94a3b8;
+  }
+  
+  * { box-sizing: border-box; }
+  
+  body {
+    @apply bg-slate-950 text-slate-100 font-sans;
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-slate-900; }
+  ::-webkit-scrollbar-thumb { @apply bg-slate-600 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-500; }
+}
+
+@layer components {
+  .card {
+    @apply bg-slate-800/60 border border-slate-700/50 rounded-xl backdrop-blur-sm;
+  }
+  .card-glass {
+    @apply bg-white/5 border border-white/10 rounded-xl backdrop-blur-md;
+  }
+  .btn-primary {
+    @apply bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-slate-700 hover:bg-slate-600 text-slate-100 font-medium px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2;
+  }
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-500 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2;
+  }
+  .btn-success {
+    @apply bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2;
+  }
+  .input {
+    @apply bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-full transition-all;
+  }
+  .label { @apply text-sm font-medium text-slate-300 mb-1 block; }
+  .badge-green { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30; }
+  .badge-red { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30; }
+  .badge-yellow { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30; }
+  .badge-blue { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-400 border border-blue-500/30; }
+  .badge-purple { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/20 text-purple-400 border border-purple-500/30; }
+  .kpi-card {
+    @apply card p-5 hover:border-indigo-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/10;
+  }
+  .section-title { @apply text-xl font-bold text-slate-100 mb-1; }
+  .section-subtitle { @apply text-sm text-slate-400; }
+  .table-row { @apply border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors; }
+  .th { @apply px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider; }
+  .td { @apply px-4 py-3 text-sm text-slate-300; }
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-700/60 transition-all duration-200 cursor-pointer text-sm font-medium;
+  }
+  .sidebar-item-active {
+    @apply sidebar-item bg-indigo-600/20 text-indigo-400 border border-indigo-500/20;
+  }
+  .status-feasible { @apply badge-green; }
+  .status-infeasible { @apply badge-red; }
+  .status-overridden { @apply badge-yellow; }
+  .status-pending { @apply badge-yellow; }
+  .status-scheduled { @apply badge-blue; }
+  .status-completed { @apply badge-green; }
+  .status-cancelled { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-500/20 text-slate-400 border border-slate-500/30; }
+  
+  .priority-1 { @apply text-red-400 font-bold; }
+  .priority-2 { @apply text-orange-400 font-semibold; }
+  .priority-3 { @apply text-amber-400; }
+  .priority-4 { @apply text-blue-400; }
+  .priority-5 { @apply text-slate-400; }
+  
+  .alert-error { @apply bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-300; }
+  .alert-warning { @apply bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-amber-300; }
+  .alert-success { @apply bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-emerald-300; }
+  .alert-info { @apply bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-blue-300; }
+}
+
+/* Gantt chart styles */
+.gantt-container { overflow-x: auto; overflow-y: auto; max-height: 70vh; }
+.gantt-task { cursor: pointer; transition: opacity 0.2s; }
+.gantt-task:hover { opacity: 0.85; }
+.gantt-task-feasible { @apply fill-indigo-500; }
+.gantt-task-infeasible { @apply fill-red-500; }
+.gantt-task-overridden { @apply fill-amber-500; }
+.gantt-task-maintenance { @apply fill-slate-600; }
+.gantt-task-changeover { @apply fill-purple-700; }
+
+/* Tooltip */
+.tooltip {
+  @apply absolute z-50 bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-xl text-sm pointer-events-none max-w-xs;
+}
+
+/* Loading spinner */
+.spinner {
+  @apply animate-spin rounded-full border-2 border-slate-600 border-t-indigo-500;
+}
+
+/* Slider */
+input[type="range"] {
+  @apply w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-500;
+}
+
+/* Modal overlay */
+.modal-overlay {
+  @apply fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+}
+.modal-content {
+  @apply bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto;
+}
+
+/* Animated gradient border for active schedule */
+.gradient-border {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+  padding: 1px;
+  border-radius: 12px;
+}
+.gradient-border-inner { @apply bg-slate-800 rounded-xl; }
+
+/* Chart container */
+.recharts-responsive-container { min-height: 200px; }
+
+/* Sidebar gradient */
+.sidebar-gradient {
+  background: linear-gradient(180deg, #0f172a 0%, #1a1040 50%, #0f172a 100%);
+}
