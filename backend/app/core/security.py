@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 import bcrypt
-from app.core.config import settings
+from backend.app.core.config import settings
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

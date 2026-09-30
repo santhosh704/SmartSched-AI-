@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass, field
 
-from app.scheduler.constraint_validator import ConstraintValidator
+from backend.app.scheduler.constraint_validator import ConstraintValidator
 
 # Shift hours: start_hour, end_hour
 SHIFT_HOURS = {

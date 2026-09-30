@@ -6,22 +6,23 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 
+from pydantic import BaseModel
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
-from app.core.database import Base, engine, get_db
-from app.core.security import verify_password, create_access_token, get_password_hash
-from app.core.auth import get_current_user, require_roles
-from app.models.models import (
+from backend.app.core.config import settings
+from backend.app.core.database import Base, engine, get_db
+from backend.app.core.security import verify_password, create_access_token, get_password_hash
+from backend.app.core.auth import get_current_user, require_roles
+from backend.app.models.models import (
     User, Product, Routing, Machine, Operator, Skill, Tool, Material,
     MaintenanceWindow, ChangeoverMatrix, Order, Schedule, ScheduleAssignment,
-    AuditLog, ConstraintOverride
+    AuditLog, ConstraintOverride, DisruptionEvent
 )
-from app.services.seed_data import seed_all
-from app.scheduler.engine import (
+from backend.app.services.seed_data import seed_all
+from backend.app.scheduler.engine import (
     SchedulingContext, run_scheduler, ScheduleResult
 )
 
@@ -126,7 +127,7 @@ def save_schedule_result(result: ScheduleResult, db: Session, username: str,
         date_range_end=date_range_end,
         soft_weights=json.dumps(soft_weights or {}),
         total_orders=result.total_orders,
-        on_time_orders=result.on_time_orders,
+        on_time_orders=result.on_time_orders, created_at=datetime.utcnow(),
     )
     db.add(sched)
     db.flush()
@@ -362,6 +363,49 @@ def generate_schedule(
               f"Generated {objective} schedule. On-time: {result.on_time_percentage}%, Violations: {result.constraint_violations}")
     
     return _schedule_response(sched, result)
+
+@app.post("/schedule/validate")
+def validate_schedule(
+    request: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "production_manager", "planner"]))
+):
+    objective = request.get("objective", "balanced")
+    soft_weights = request.get("soft_weights", {})
+    date_range_start = datetime.fromisoformat(request["date_range_start"]) if request.get("date_range_start") else None
+    date_range_end = datetime.fromisoformat(request["date_range_end"]) if request.get("date_range_end") else None
+
+    ctx = build_scheduling_context(db)
+    result = run_scheduler(ctx, objective, date_range_start, date_range_end, soft_weights)
+
+    # Log audit for validation
+    log_audit(db, current_user, "VALIDATE_SCHEDULE", "schedule", None,
+              f"Validated schedule for objective {objective}. On-time: {result.on_time_percentage}%, Violations: {result.constraint_violations}")
+
+    # Return validation result without persisting schedule
+    return {
+        "schedule_id": None,
+        "objective": result.objective,
+        "feasible": result.feasible,
+        "created_at": datetime.utcnow().isoformat(),
+        "solve_time_seconds": result.solve_time_seconds,
+        "on_time_percentage": result.on_time_percentage,
+        "late_orders_count": result.late_orders_count,
+        "total_tardiness_minutes": result.total_tardiness_minutes,
+        "avg_tardiness_minutes": result.avg_tardiness_minutes,
+        "overtime_hours": result.overtime_hours,
+        "changeover_hours": result.changeover_hours,
+        "constraint_violations": result.constraint_violations,
+        "estimated_cost": result.estimated_cost,
+        "estimated_energy_kwh": result.estimated_energy_kwh,
+        "machine_utilization": result.machine_utilization,
+        "operator_utilization": result.operator_utilization,
+        "tool_utilization": result.tool_utilization,
+        "total_orders": result.total_orders,
+        "on_time_orders": result.on_time_orders,
+        "error_analysis": result.error_analysis
+    }
+
 
 def _schedule_response(sched: Schedule, result: Optional[ScheduleResult] = None) -> dict:
     return {
@@ -868,6 +912,118 @@ def run_demo(
             "improvement": round(results["delivery_first"]["on_time_percentage"] - results["baseline"]["on_time_percentage"], 1),
             "overtime_reduction": round(results["baseline"]["overtime_hours"] - results["cost_first"]["overtime_hours"], 2),
             "changeover_reduction": round(results["baseline"]["changeover_hours"] - results["cost_first"]["changeover_hours"], 2),
+        }
+    }
+
+class FailureLabRequest(BaseModel):
+    scenario_id: str
+
+@app.post("/demo/failure-lab")
+def run_failure_lab(
+    request: FailureLabRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "production_manager"]))
+):
+    ctx = build_scheduling_context(db)
+    date_start = datetime(2026, 9, 3, 6, 0, 0)
+    date_end = date_start + timedelta(days=14)
+    
+    if request.scenario_id == "FS1":
+        # Material shortage
+        for mat in ctx.materials.values():
+            mat.stock_quantity = 0.0
+    elif request.scenario_id == "FS2":
+        # All machines under maintenance
+        for m in ctx.machines.values():
+            ctx.maintenance_windows.append(MaintenanceWindow(
+                machine_id=m.machine_id, start_time=date_start, end_time=date_end, mandatory=True
+            ))
+    elif request.scenario_id == "FS3":
+        # No qualified operators
+        for op in ctx.operators.values():
+            op.skills = "{}"
+    elif request.scenario_id == "FS5":
+        # Tool Saturation Conflict
+        for tool in ctx.tools.values():
+            tool.total_quantity = 0
+    elif request.scenario_id == "FS7":
+        # Machine Type Mismatch
+        for m in ctx.machines.values():
+            m.eligible_operations = "[]"
+            
+    # Run the balanced objective so it tries to satisfy hard constraints
+    result = run_scheduler(ctx, "balanced", date_start, date_end)
+    
+    sched = Schedule(
+        schedule_id=result.schedule_id, objective=result.objective, feasible=result.feasible,
+        on_time_percentage=result.on_time_percentage, late_orders_count=result.late_orders_count,
+        total_tardiness_minutes=result.total_tardiness_minutes, avg_tardiness_minutes=result.avg_tardiness_minutes,
+        overtime_hours=result.overtime_hours, changeover_hours=result.changeover_hours,
+        estimated_cost=result.estimated_cost, estimated_energy_kwh=result.estimated_energy_kwh,
+        machine_utilization=result.machine_utilization, operator_utilization=result.operator_utilization,
+        tool_utilization=result.tool_utilization, constraint_violations=result.constraint_violations,
+        schedule_start=result.schedule_start, schedule_end=result.schedule_end,
+        total_orders=result.total_orders, on_time_orders=result.on_time_orders, created_at=datetime.utcnow()
+    )
+    
+    log_audit(db, current_user, "FAILURE_LAB", "scenario", request.scenario_id, f"Executed failure lab scenario {request.scenario_id}")
+    
+    return _schedule_response(sched, result)
+class DisruptionRequest(BaseModel):
+    disruption_type: str
+    resource_id: str
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    severity: str = "high"
+    description: str
+
+@app.post("/demo/disruption")
+def inject_disruption(
+    req: DisruptionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "production_manager", "planner"]))
+):
+    ctx_before = build_scheduling_context(db)
+    date_start = datetime.utcnow()
+    date_end = date_start + timedelta(days=14)
+    result_before = run_scheduler(ctx_before, "balanced", date_start, date_end)
+    sched_before = save_schedule_result(result_before, db, current_user.username, date_start, date_end)
+    
+    event = DisruptionEvent(
+        disruption_type=req.disruption_type, resource_id=req.resource_id,
+        start_time=req.start_time or date_start, end_time=req.end_time or date_end,
+        severity=req.severity, description=req.description, created_by=current_user.username
+    )
+    db.add(event)
+    
+    ctx_after = build_scheduling_context(db)
+    if req.disruption_type == "MACHINE_BREAKDOWN":
+        ctx_after.maintenance_windows.append(MaintenanceWindow(
+            machine_id=req.resource_id, start_time=req.start_time or date_start, end_time=req.end_time or date_end, mandatory=True
+        ))
+    elif req.disruption_type == "OPERATOR_UNAVAILABLE":
+        if req.resource_id in ctx_after.operators:
+            ctx_after.operators[req.resource_id].skills = "{}"
+    elif req.disruption_type == "MATERIAL_SHORTAGE":
+        if req.resource_id in ctx_after.materials:
+            ctx_after.materials[req.resource_id].stock_quantity = 0.0
+            
+    result_after = run_scheduler(ctx_after, "balanced", date_start, date_end)
+    sched_after = save_schedule_result(result_after, db, current_user.username, date_start, date_end)
+    
+    log_audit(db, current_user, "DISRUPTION_INJECTED", "disruption_events", str(event.id), f"Injected {req.disruption_type} on {req.resource_id}")
+    db.commit()
+    
+    return {
+        "status": "completed",
+        "disruption": {"id": event.id, "type": req.disruption_type, "resource": req.resource_id},
+        "before": _schedule_response(sched_before, result_before),
+        "after": _schedule_response(sched_after, result_after),
+        "kpi_diff": {
+            "on_time_diff": round(result_after.on_time_percentage - result_before.on_time_percentage, 1),
+            "tardiness_diff": round(result_after.total_tardiness_minutes - result_before.total_tardiness_minutes, 1),
+            "cost_diff": round(result_after.estimated_cost - result_before.estimated_cost, 2),
+            "violations_diff": result_after.constraint_violations - result_before.constraint_violations
         }
     }
 

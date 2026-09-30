@@ -6,11 +6,11 @@ import json
 import random
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from app.models.models import (
+from backend.app.models.models import (
     User, Product, Routing, Machine, Operator, Skill, Tool,
     Material, MaintenanceWindow, ChangeoverMatrix, Order, AuditLog
 )
-from app.core.security import get_password_hash
+from backend.app.core.security import get_password_hash
 
 random.seed(42)
 

@@ -1,4 +1,4 @@
-from app.core.database import Base
+from backend.app.core.database import Base
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -212,3 +212,15 @@ class ConstraintOverride(Base):
     resolved_at = Column(DateTime, nullable=True)
     old_schedule_data = Column(Text)
     new_schedule_data = Column(Text)
+
+class DisruptionEvent(Base):
+    __tablename__ = "disruption_events"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    disruption_type = Column(String(50), nullable=False) # MACHINE_BREAKDOWN, OPERATOR_UNAVAILABLE, MATERIAL_SHORTAGE
+    resource_id = Column(String(50)) # e.g. M01, OP01, STEEL-A
+    start_time = Column(DateTime, nullable=True)
+    end_time = Column(DateTime, nullable=True)
+    severity = Column(String(20), default="high") # low, medium, high, critical
+    description = Column(Text)
+    created_by = Column(String(50))
+    created_at = Column(DateTime, default=datetime.utcnow)

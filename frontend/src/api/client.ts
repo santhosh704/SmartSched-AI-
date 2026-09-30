@@ -62,6 +62,8 @@ export const getAuditLog = (params?: any) => api.get('/audit', { params });
 
 // Demo
 export const runFullDemo = () => api.post('/demo/run-full');
+export const runFailureLab = (scenario_id: string) => api.post('/demo/failure-lab', { scenario_id });
+export const runDisruption = (payload: any) => api.post('/demo/disruption', payload);
 
 // Health
 export const getHealth = () => api.get('/health');

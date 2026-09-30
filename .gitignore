@@ -1,3 +1,23 @@
 .DS_Store
 .vscode/
 .idea/
+
+# Sensitive & temporary files
+.env
+secrets/
+passwords/
+*.key
+*.pem
+*.pem.pub
+*.crt
+*.p12
+*.jks
+node_modules/
+backend/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.sqlite
+*.db
+*.log
+coverage/
