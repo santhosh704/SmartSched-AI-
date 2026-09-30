@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from main import app
+from backend.main import app
 from app.core.database import Base
 from backend.tests.conftest import engine, TestingSessionLocal
 from app.services.seed_data import seed_all
